@@ -1,5 +1,5 @@
 // Cambia esta URL cuando tengas el backend desplegado en Render
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = "https://crud-personas-python.onrender.com/docs";
 
 const tablaPersonas = document.getElementById("tabla-personas");
 const formPersona = document.getElementById("form-persona");
