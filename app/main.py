@@ -1,112 +1,77 @@
-from typing import List, Optional
+from typing import List
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 
+from . import crud, models, schemas
+from .database import Base, SessionLocal, engine
 
-# ==========================
-# SCHEMAS (Pydantic models)
-# ==========================
-
-class PersonaBase(BaseModel):
-    """Campos comunes de persona."""
-    nombre: str
-    apellido: str
-    email: Optional[str] = None
-
-
-class PersonaCreate(PersonaBase):
-    """Datos necesarios para crear una persona."""
-    id: int
-
-
-class PersonaUpdate(BaseModel):
-    """Campos opcionales para actualizar una persona."""
-    nombre: Optional[str] = None
-    apellido: Optional[str] = None
-    email: Optional[str] = None
-
-
-class Persona(PersonaBase):
-    """Modelo que se devuelve en las respuestas."""
-    id: int
-
-
-# ==========================
-# "BASE DE DATOS" EN MEMORIA
-# ==========================
-
-# En producción esto sería una tabla en la BD.
-bd_personas: List[Persona] = []
-
-
-# ==========================
-# APLICACIÓN FASTAPI
-# ==========================
+# Crear tablas en la BD (si no existen)
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="CRUD de Personas", version="1.0.0")
+
+# CORS para que Netlify pueda llamar a la API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # en producción puedes restringir a tu dominio de Netlify
+    allow_origins=["*"],  # en prod podrías restringir a tu dominio de Netlify
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
+# Dependencia para obtener una sesión de BD en cada request
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 
 # ==========================
 # ENDPOINTS (CRUD)
 # ==========================
 
-@app.get("/personas", response_model=List[Persona])
-def listar_personas() -> List[Persona]:
-    """Devuelve todas las personas."""
-    return bd_personas
+@app.get("/personas", response_model=List[schemas.Persona])
+def listar_personas(db: Session = Depends(get_db)):
+    return crud.get_personas(db)
 
 
-@app.get("/personas/{persona_id}", response_model=Persona)
-def obtener_persona(persona_id: int) -> Persona:
-    """Devuelve una persona por ID."""
-    for persona in bd_personas:
-        if persona.id == persona_id:
-            return persona
-    raise HTTPException(status_code=404, detail="Persona no encontrada")
+@app.get("/personas/{persona_id}", response_model=schemas.Persona)
+def obtener_persona(persona_id: int, db: Session = Depends(get_db)):
+    persona = crud.get_persona(db, persona_id)
+    if persona is None:
+        raise HTTPException(status_code=404, detail="Persona no encontrada")
+    return persona
 
 
-@app.post("/personas", response_model=Persona, status_code=201)
-def crear_persona(persona_crear: PersonaCreate) -> Persona:
-    """Crea una nueva persona."""
-    # Validar que el ID no exista
-    for persona in bd_personas:
-        if persona.id == persona_crear.id:
-            raise HTTPException(status_code=400, detail="Ya existe una persona con ese ID")
+@app.post("/personas", response_model=schemas.Persona, status_code=201)
+def crear_persona(persona_crear: schemas.PersonaCreate, db: Session = Depends(get_db)):
+    existente = crud.get_persona(db, persona_crear.id)
+    if existente is not None:
+        raise HTTPException(status_code=400, detail="Ya existe una persona con ese ID")
 
-    nueva_persona = Persona(**persona_crear.dict())
-    bd_personas.append(nueva_persona)
-    return nueva_persona
+    return crud.create_persona(db, persona_crear)
 
 
-@app.put("/personas/{persona_id}", response_model=Persona)
-def actualizar_persona(persona_id: int, datos_actualizacion: PersonaUpdate) -> Persona:
-    """Actualiza parcialmente una persona por ID."""
-    for idx, persona in enumerate(bd_personas):
-        if persona.id == persona_id:
-            datos = datos_actualizacion.dict(exclude_unset=True)
-            persona_actualizada = persona.copy(update=datos)
-            bd_personas[idx] = persona_actualizada
-            return persona_actualizada
-
-    raise HTTPException(status_code=404, detail="Persona no encontrada")
+@app.put("/personas/{persona_id}", response_model=schemas.Persona)
+def actualizar_persona(
+    persona_id: int,
+    datos_actualizacion: schemas.PersonaUpdate,
+    db: Session = Depends(get_db),
+):
+    persona = crud.update_persona(db, persona_id, datos_actualizacion)
+    if persona is None:
+        raise HTTPException(status_code=404, detail="Persona no encontrada")
+    return persona
 
 
 @app.delete("/personas/{persona_id}", status_code=204)
-def eliminar_persona(persona_id: int) -> None:
-    """Elimina una persona por ID."""
-    for idx, persona in enumerate(bd_personas):
-        if persona.id == persona_id:
-            bd_personas.pop(idx)
-            return
-
-    raise HTTPException(status_code=404, detail="Persona no encontrada")
+def eliminar_persona(persona_id: int, db: Session = Depends(get_db)):
+    eliminado = crud.delete_persona(db, persona_id)
+    if not eliminado:
+        raise HTTPException(status_code=404, detail="Persona no encontrada")
+    return None
