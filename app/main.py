@@ -7,6 +7,9 @@ from sqlalchemy.orm import Session
 from . import crud, models, schemas
 from .database import Base, SessionLocal, engine
 
+from fastapi import BackgroundTasks
+from . import email_utils
+
 # Crear tablas en la BD (si no existen)
 Base.metadata.create_all(bind=engine)
 
@@ -15,7 +18,7 @@ app = FastAPI(title="CRUD de Personas", version="1.0.0")
 # CORS para que Netlify pueda llamar a la API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # en prod podrías restringir a tu dominio de Netlify
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -49,12 +52,27 @@ def obtener_persona(persona_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/personas", response_model=schemas.Persona, status_code=201)
-def crear_persona(persona_crear: schemas.PersonaCreate, db: Session = Depends(get_db)):
+def crear_persona(
+    persona_crear: schemas.PersonaCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     existente = crud.get_persona(db, persona_crear.id)
     if existente is not None:
         raise HTTPException(status_code=400, detail="Ya existe una persona con ese ID")
 
-    return crud.create_persona(db, persona_crear)
+    persona = crud.create_persona(db, persona_crear)
+
+    # Si la persona tiene email, enviamos correo en background
+    if persona.email:
+        background_tasks.add_task(
+            email_utils.send_welcome_email,
+            to_email=persona.email,
+            nombre=persona.nombre,
+        )
+
+    return persona
+
 
 
 @app.put("/personas/{persona_id}", response_model=schemas.Persona)

@@ -63,7 +63,7 @@ def actualizar_persona(
         persona.nombre = nuevo_nombre
     if nuevo_apellido:
         persona.apellido = nuevo_apellido
-    # aquí sí puede ser cadena vacía para "borrar" el email
+   
     if nuevo_email is not None:
         persona.email = nuevo_email or None
 
