@@ -16,11 +16,10 @@ class PersonaCreate(PersonaBase):
 class PersonaUpdate(BaseModel):
     nombre: Optional[str] = None
     apellido: Optional[str] = None
-    email: Optional[str] = None
 
 
 class Persona(PersonaBase):
     id: int
 
     class Config:
-        orm_mode = True  # permite devolver objetos SQLAlchemy directamente
+        orm_mode = True

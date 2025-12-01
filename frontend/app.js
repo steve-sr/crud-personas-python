@@ -1,4 +1,4 @@
-// Cambia esta URL cuando tengas el backend desplegado en Render
+
 const API_BASE_URL = "https://crud-personas-python.onrender.com";
 
 const tablaPersonas = document.getElementById("tabla-personas");
@@ -75,7 +75,16 @@ function cargarEnFormulario(persona) {
   document.getElementById("nombre").value = persona.nombre;
   document.getElementById("apellido").value = persona.apellido;
   document.getElementById("email").value = persona.email || "";
+
+  // Evitar que cambien el ID y el email al editar
+  document.getElementById("id").readOnly = true;
+  document.getElementById("email").readOnly = true;
+
+  const btn = document.getElementById("btn-submit");
+  btn.textContent = "Actualizar";
+  btn.classList.add("update-mode");
 }
+
 
 formPersona.addEventListener("submit", async (evento) => {
   evento.preventDefault();
@@ -88,17 +97,18 @@ formPersona.addEventListener("submit", async (evento) => {
 
   const persona = { id, nombre, apellido, email };
 
-  // Primero probamos si la persona ya existe (para decidir POST o PUT)
+  // Verificamos si la persona ya existe para decidir POST o PUT
   const respuestaExiste = await fetch(`${API_BASE_URL}/personas/${id}`);
+
   if (respuestaExiste.ok) {
-    // Existe: actualizamos (PUT)
+    // Existe: ACTUALIZAR SOLO nombre y apellido
     await fetch(`${API_BASE_URL}/personas/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombre, apellido, email }),
+      body: JSON.stringify({ nombre, apellido }), // 👈 solo esto
     });
   } else {
-    // No existe: creamos (POST)
+    // No existe: CREAR con id, nombre, apellido, email
     await fetch(`${API_BASE_URL}/personas`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -107,8 +117,12 @@ formPersona.addEventListener("submit", async (evento) => {
   }
 
   formPersona.reset();
+  document.getElementById("id").readOnly = false;
+  document.getElementById("email").readOnly = false;
+
   await obtenerPersonas();
 });
+
 
 async function eliminarPersona(id) {
   const confirmar = window.confirm("¿Seguro que quieres eliminar esta persona?");
