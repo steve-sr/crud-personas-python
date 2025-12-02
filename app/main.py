@@ -7,9 +7,6 @@ from sqlalchemy.orm import Session
 from . import crud, models, schemas
 from .database import Base, SessionLocal, engine
 
-from fastapi import BackgroundTasks
-from . import email_utils
-
 # Crear tablas en la BD (si no existen)
 Base.metadata.create_all(bind=engine)
 
@@ -54,17 +51,10 @@ def obtener_persona(persona_id: int, db: Session = Depends(get_db)):
 @app.post("/personas", response_model=schemas.Persona, status_code=201)
 def crear_persona(
     persona: schemas.PersonaCreate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    nueva_persona = crud.create_persona(db, persona)
 
-    if persona.email:
-        background_tasks.add_task(
-            email_utils.send_welcome_email,
-            to_email=persona.email,
-            nombre=persona.nombre,
-        )
+    nueva_persona = crud.create_persona(db, persona)
 
     return nueva_persona
 
