@@ -37,6 +37,7 @@ def send_welcome_email(to_email: Optional[str], nombre: str) -> None:
     Envía un correo de bienvenida si hay email configurado y destino válido.
     Pensado para ejecutarse en background (no bloquea la respuesta de la API).
     """
+    print(f"🔔 Ejecutando send_welcome_email para {to_email}")
     if not to_email:
         return
 

@@ -53,17 +53,12 @@ def obtener_persona(persona_id: int, db: Session = Depends(get_db)):
 
 @app.post("/personas", response_model=schemas.Persona, status_code=201)
 def crear_persona(
-    persona_crear: schemas.PersonaCreate,
+    persona: schemas.PersonaCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    existente = crud.get_persona(db, persona_crear.id)
-    if existente is not None:
-        raise HTTPException(status_code=400, detail="Ya existe una persona con ese ID")
+    nueva_persona = crud.create_persona(db, persona)
 
-    persona = crud.create_persona(db, persona_crear)
-
-    # Si la persona tiene email, enviamos correo en background
     if persona.email:
         background_tasks.add_task(
             email_utils.send_welcome_email,
@@ -71,9 +66,7 @@ def crear_persona(
             nombre=persona.nombre,
         )
 
-    return persona
-
-
+    return nueva_persona
 
 @app.put("/personas/{persona_id}", response_model=schemas.Persona)
 def actualizar_persona(
